@@ -1,0 +1,10 @@
+Collecting psycopg2
+  Using cached psycopg2-2.9.5.tar.gz (384 kB)
+Building wheels for collected packages: psycopg2
+  Building wheel for psycopg2 (setup.py): started
+  Building wheel for psycopg2 (setup.py): finished with status 'error'
+  Running setup.py clean for psycopg2
+Failed to build psycopg2
+Installing collected packages: psycopg2
+    Running setup.py install for psycopg2: started
+    Running setup.py install for psycopg2: finished with status 'error'
