@@ -1,82 +1,53 @@
-from typing import Union
-import psycopg2
 import uvicorn
 from fastapi import FastAPI
+from Accounts.Models.account import Account
+from Accounts.Services.account import AccountService
+from Accounts.Repositories.account import AccountRepository
+from Accounts.Repositories.customer import CustomerRepository
+from Accounts.Repositories.address import AddressRepository
+from typing import List
 
 app = FastAPI()
-
-connection = psycopg2.connect(
-    host="localhost",
-    database="postgres",
-    user="postgres",
-    password='password123',
-)
-connection.set_session(autocommit=True)
-
-@app.get("/")
-def read_root():
-    return {"Hello": "World"}
+address_repository = AddressRepository()
+customer_repository = CustomerRepository()
+account_repository = AccountRepository()
+account_service = AccountService(account_repository, customer_repository, address_repository)
 
 
-@app.get("/api/{item_id}")
-def read_item(item_id: int, q: Union[str, None] = None):
-    return {"item_id": item_id, "q": q}
+@app.get('/api/accounts', response_model=List[Account])
+async def retrieve_accounts() -> List[Account]:
+    return account_service.get_all_accounts()
 
-@app.get("/api/account/{account_id}")
-def get_account_id(account_id: int ):
-    with connection.cursor() as cursor:
-        cursor.execute('SELECT * FROM account')
-        result = cursor.fetchone()
-        return result
+@app.get('/api/accounts/{account_number}')
+async def retrieve_account(account_number) -> Account:
+    return account_service.get_account(account_number)
 
-@app.get("/api/address/{account_id}")
-def get_account_id(account_id: int ):
-    with connection.cursor() as cursor:
-        cursor.execute('SELECT * FROM address')
-        result = cursor.fetchone()
-        return result
+@app.post('/api/accounts')
+async def open_account(account: Account) -> Account:
+    if account.current_balance < 25.0:
+        raise ValueError('$25.00 minimum required on account opening')
+    return account_service.open_account(account)
 
-@app.get("/api/customer/")
-def get_account_id():
-    with connection.cursor() as cursor:
-        cursor.execute('SELECT FirstName FROM customer where ID=11')
-        result = cursor.fetchone()
-        return result
+@app.put('/api/accounts/{account_number}/withdraw/{amount}')
+async def withdraw(account_number, amount) -> Account:
+    mod = float(amount)
+    if mod <= 0:
+        raise ValueError('Invalid amount specified on withdrawal')
+    account = account_service.get_account(account_number)
+    if mod > account.current_balance:
+        raise ValueError('Withdrawal not completed because of potential overdraw')
+    return account_service.withdraw(account_number, mod)
 
-# @app.post('/api/account/new')
-# def create_account(account_id: int):
-#     with connection.cursor() as cursor:
-#         cursor.execute('INSERT INTO account (AccountNumber,CustomerID,CurrentBalance) VALUES (1, 1, 100);')
-#         result = cursor.fetchone()
-#         print(result)
-#         return result
+@app.put('/api/accounts/{account_number}/deposit/{amount}')
+async def deposit(account_number, amount) -> Account:
+    mod = float(amount)
+    if mod <= 0:
+        raise ValueError('Invalid amount specified on depost')
+    return account_service.deposit(account_number, mod)
 
-@app.post('/api/account/new')
-def create_account(account_id: int):
-    with connection.cursor() as cursor:
-        cursor.execute('INSERT INTO address ( Address ,City,State ,ZipCode ) VALUES ( \'White house\', \'irvine\', \'CA\', \'9171\');')
-        cursor.execute('INSERT INTO customer (FirstName, LastName, AddressID, Email) VALUES (\'Gavin2\', \'Gray2\', 1, \'gavg@capgroup.com\');')
-        cursor.execute('INSERT INTO account ( AccountNumber, CustomerID,CurrentBalance) VALUES (1, 1, 100);')
-        # cursor.execute('SELECT * FROM customer;')
-        # result = cursor.fetchone()
-        # print(result)
-        return 'Object Created succesfully'
-
-# @app.post('/api/account/new')
-# def create_account(account_id: int):
-#     with connection.cursor() as cursor:
-#         cursor.execute('INSERT INTO account (AccountNumber,CustomerID,CurrentBalance) VALUES (1, 1, 100);')
-#         result = cursor.fetchone()
-#         print(result)
-#         return result
-
-# @app.post('/api/account/new')
-# def create_account(account_id: int):
-#     with connection.cursor() as cursor:
-#         cursor.execute('INSERT INTO account (AccountNumber,CustomerID,CurrentBalance) VALUES (1, 1, 100);')
-#         result = cursor.fetchone()
-#         print(result)
-#         return result
+@app.delete('/api/accounts/{account_number}')
+async def close_account(account_number) -> None:
+    account_service.close_account(account_number)
 
 if __name__ == "__main__":
-    uvicorn.run("app:app", host="0.0.0.0", port=8080, reload=True, timeout_keep_alive=3600, workers=10)
+    uvicorn.run("app:app",host="0.0.0.0",port=8080,reload=True) #,timeout_keep_alive=3600,debug=True,workers=10)
